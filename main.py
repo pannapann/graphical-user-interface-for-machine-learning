@@ -13,9 +13,11 @@ import datetime
 import os
 from io import StringIO
 from pycaret.regression import *
+from PIL import Image
 
 #Todo
 # create new feature (selectable ex time date if timeseries)
+# add plot feature (eda) or add plot scatter any graph
 
 
 
@@ -48,10 +50,27 @@ if selected_target == 'Regression' and uploaded_file is not None:
      s = setup(dataframe, target = selected_target,silent =True, train_size = train_ratio)
 
      best = compare_models(sort='rmse', n_select=3)
-     st.write(best[0])
-     st.write(best[1])
-     st.write(best[2])
+     st.header('Best model')
      st.write(pull())
-     predictions = predict_model(best[0], data=dataframe)
 
+     models = ('1', '2', '3')
+     selected_model = st.selectbox('Select model (top 3)', models)
+     st.write('selected model :', best[int(selected_model)-1])
+     st.header('Predicted dataframe')
+     predictions = predict_model(best[int(selected_model)-1], data=dataframe)
      st.write(predictions.head())
+
+     st.header('Predicted result')
+     dictt = {'actual': predictions[selected_target], 'predict': predictions['Label']}
+     df_test = pd.DataFrame(dictt)
+     st.write(df_test.head())
+
+     st.header('Residuals')
+     plot_model(best[int(selected_model)-1], plot='residuals',save=True)
+     image = Image.open('Residuals.png')
+     st.image(image, caption='Residuals')
+
+     st.header('Feature importance')
+     plot_model(best[int(selected_model) - 1], plot='feature', save=True)
+     image = Image.open('Feature Importance.png')
+     st.image(image, caption='Feature importance')
