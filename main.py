@@ -3,18 +3,21 @@ import pandas as pd
 import plotly.express as px
 from PIL import Image
 import datetime
-
+import plotly
+import json
+import re
 #Todo
 # create new feature (selectable ex time date if timeseries)
 # (DONE) add plot feature (eda) or add plot scatter any graph
 # add add feature and try prediction (https://pycaret.gitbook.io/docs/learn-pycaret/official-blog/build-and-deploy-ml-app-with-pycaret-and-streamlit)
 # add feature small batches (if dataset is too large we just sample it for efficiency)
-# save model (button or automatically)
+# (DONE) save model (button or automatically)
 # (DONE) create function at compare_model() so we can cache increase speed
 # add selection number of fold
 # explore setup pycaret(data preparation)
 # (OPTIONAL) add sort at compare_model (sort by rmse mae r2 etc)
 # add config file (store dict)
+# add tune model
 
 
 classification_dict = {'Area Under the Curve':['auc','AUC'],
@@ -47,12 +50,24 @@ regression_dict = {'Residuals Plot':['residuals','Residuals'],
                     'Feature Importance (all)':['feature_all', 'Feature Importance (All)']}
 
 
-clustering_dict ={ #'Cluster PCA Plot (2d)':['cluster','cluster'],
-                    # 'Cluster TSnE (3d)':['tsne', 'tsne'],
+clustering_dict = {'Cluster PCA Plot (2d)':['cluster','cluster'],
+                    'Cluster TSnE (3d)':['tsne', 'tsne'],
                     'Elbow Plot':['elbow', 'Elbow'],
                     'Silhouette Plot':['silhouette', 'Silhouette'],
-                    'Distance Plot':['distance', 'Distance'],}
-                    #'Distribution Plot':['distribution', 'distribution'],}
+                    'Distance Plot':['distance', 'Distance'],
+                    'Distribution Plot':['distribution', 'distribution'],}
+
+anomaly_dict = {'t-SNE (3d) Dimension Plot':['tsne', 'tsne'],
+                'UMAP Dimensionality Plot':['umap', 'umap']}
+
+
+def read_from_html(plot_json):
+    with open(plot_json) as f:
+        html = f.read()
+    call_arg_str = re.findall(r'Plotly\.newPlot\((.*)\)', html[-2**16:])[0]
+    call_args = json.loads(f'[{call_arg_str}]')
+    plotly_json = {'data': call_args[1], 'layout': call_args[2]}
+    return plotly.io.from_json(json.dumps(plotly_json))
 
 
 def init_pycaret():
@@ -113,7 +128,7 @@ def eda_pycaret():
 
 def select_ml():
     st.header('Select machine learning types')
-    ml = ('Regression', 'Classification', 'Clustering')
+    ml = ('Regression', 'Classification', 'Clustering', 'Anomaly Detection')
     selected_ml = st.selectbox('Select machine learning types', ml)
     st.write('selected machine learning types :', selected_ml)
     return selected_ml
@@ -129,6 +144,9 @@ def evaluation_pycaret(selected_ml,selected_model,best):
     elif selected_ml == 'Clustering':
         dict = clustering_dict
         model_ = best
+    elif selected_ml == 'Anomaly Detection':
+        dict = anomaly_dict
+        model_ = best
 
     st.header('Select evaluation')
     options = st.multiselect(
@@ -137,9 +155,14 @@ def evaluation_pycaret(selected_ml,selected_model,best):
 
     for i in options:
         plot_model(model_, plot=dict[i][0], save=True)
-        image = Image.open(f'{dict[i][1]}.png')
-        st.header(i)
-        st.image(image, caption=i)
+        try:
+            image = Image.open(f'{dict[i][1]}.png')
+            st.header(i)
+            st.image(image, caption=i)
+        except:
+            st.header(i)
+            st.plotly_chart(read_from_html(dict[i][1]))
+
 
 
 
@@ -172,12 +195,16 @@ def select_scatter():
         st.write('Please select 2 numerical features')
 
 
-def save_model_pycaret(best,selected_model,selected_ml):
+def save_model_pycaret(best,selected_model,selected_ml,compare_df = 'default'):
     if selected_ml == 'Regression':
         model_ = best[int(selected_model) - 1]
+        selected_model = compare_df.index[int(selected_model)-1]
     elif selected_ml == 'Classification':
         model_ = best[int(selected_model) - 1]
+        selected_model = compare_df.index[int(selected_model) - 1]
     elif selected_ml == 'Clustering':
+        model_ = best
+    elif selected_ml == 'Anomaly Detection':
         model_ = best
     st.header('Save model')
     if st.button('Save model'):
@@ -196,9 +223,11 @@ def pipeline_st(selected_ml):
         st.write(compare_df)
         selected_model = top_3_model(best,selected_target)
         evaluation_pycaret(selected_ml, selected_model,best)
-        save_model_pycaret(best,selected_model,selected_ml)
+        save_model_pycaret(best,selected_model,selected_ml,compare_df)
+
     elif selected_ml in ['Clustering']:
         s = setup(dataframe, normalize=True, silent=True)
+        select_scatter()
         st.header('Select clustering model')
         cm = ('kmeans', 'ap', 'meanshift', 'sc', 'hclust', 'dbscan', 'optics', 'birch', 'kmodes')
         selected_cm = st.selectbox('Select clustering model', cm)
@@ -211,12 +240,29 @@ def pipeline_st(selected_ml):
         evaluation_pycaret(selected_ml, 1, model)
         save_model_pycaret(model,selected_cm,selected_ml)
 
+    elif selected_ml in ['Anomaly Detection']:
+        s = setup(dataframe, normalize=True, silent=True)
+        select_scatter()
+        st.header('Select anomaly detection model')
+        am = ('abod', 'cluster', 'cof', 'histogram', 'knn', 'lof', 'svm', 'pca', 'mcd', 'sod', 'sos')
+        selected_am = st.selectbox('Select clustering model', am)
+        st.write('selected anomaly detection model :', selected_am)
+        model = create_model(selected_am)
+        st.write(model)
+        result = assign_model(model)
+        st.header(f'{selected_am} model prediction')
+        st.write(result.head())
+        evaluation_pycaret(selected_ml, 1, model)
+        save_model_pycaret(model,selected_am,selected_ml)
+
 
 
 
 # Start
 dataframe,uploaded_file = initiate_dataframe()
 selected_ml = select_ml()
+
+
 if selected_ml == 'Regression' and uploaded_file is not None:
     from pycaret.regression import *
     pipeline_st(selected_ml)
@@ -226,5 +272,9 @@ elif selected_ml == 'Classification' and uploaded_file is not None:
 elif selected_ml == 'Clustering' and uploaded_file is not None:
     from pycaret.clustering import *
     pipeline_st(selected_ml)
+elif selected_ml == 'Anomaly Detection' and uploaded_file is not None:
+    from pycaret.anomaly import *
+    pipeline_st(selected_ml)
+
 
 
