@@ -1,28 +1,19 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 import plotly.express as px
-import plotly.graph_objects as go
-import json
-from pathlib import Path
-import pickle
-import datetime
-import os
-from io import StringIO
 from PIL import Image
-
+import datetime
 
 #Todo
 # create new feature (selectable ex time date if timeseries)
-# add plot feature (eda) or add plot scatter any graph
+# (DONE) add plot feature (eda) or add plot scatter any graph
 # add add feature and try prediction (https://pycaret.gitbook.io/docs/learn-pycaret/official-blog/build-and-deploy-ml-app-with-pycaret-and-streamlit)
 # add feature small batches (if dataset is too large we just sample it for efficiency)
 # save model (button or automatically)
 # (DONE) create function at compare_model() so we can cache increase speed
 # add selection number of fold
 # explore setup pycaret(data preparation)
-# add sort at compare_model (sort by rmse mae r2 etc)
+# (OPTIONAL) add sort at compare_model (sort by rmse mae r2 etc)
 # add config file (store dict)
 
 
@@ -54,6 +45,14 @@ regression_dict = {'Residuals Plot':['residuals','Residuals'],
                     'Manifold Learning':['manifold', 'Manifold Learning'],
                     'Feature Importance (top 10)':['feature', 'Feature Importance'],
                     'Feature Importance (all)':['feature_all', 'Feature Importance (All)']}
+
+
+clustering_dict ={ #'Cluster PCA Plot (2d)':['cluster','cluster'],
+                    # 'Cluster TSnE (3d)':['tsne', 'tsne'],
+                    'Elbow Plot':['elbow', 'Elbow'],
+                    'Silhouette Plot':['silhouette', 'Silhouette'],
+                    'Distance Plot':['distance', 'Distance'],}
+                    #'Distribution Plot':['distribution', 'distribution'],}
 
 
 def init_pycaret():
@@ -114,7 +113,7 @@ def eda_pycaret():
 
 def select_ml():
     st.header('Select machine learning types')
-    ml = ('Regression', 'Classification', 'Time series')
+    ml = ('Regression', 'Classification', 'Clustering')
     selected_ml = st.selectbox('Select machine learning types', ml)
     st.write('selected machine learning types :', selected_ml)
     return selected_ml
@@ -123,18 +122,26 @@ def select_ml():
 def evaluation_pycaret(selected_ml,selected_model,best):
     if selected_ml == 'Regression':
         dict = regression_dict
+        model_ = best[int(selected_model) - 1]
     elif selected_ml == 'Classification':
         dict = classification_dict
+        model_ = best[int(selected_model) - 1]
+    elif selected_ml == 'Clustering':
+        dict = clustering_dict
+        model_ = best
+
     st.header('Select evaluation')
     options = st.multiselect(
         'Select evaluation', options=dict.keys()
     )
 
     for i in options:
-        plot_model(best[int(selected_model) - 1], plot=dict[i][0], save=True)
+        plot_model(model_, plot=dict[i][0], save=True)
         image = Image.open(f'{dict[i][1]}.png')
         st.header(i)
         st.image(image, caption=i)
+
+
 
 def top_3_model(best,selected_target):
     st.header('top 3 model')
@@ -165,15 +172,46 @@ def select_scatter():
         st.write('Please select 2 numerical features')
 
 
-def pipeline_st():
-    train_ratio, selected_target = init_pycaret()
-    best, compare_df = setup_pycaret(train_ratio, selected_target)
-    eda_pycaret()
-    select_scatter()
-    st.header('Compare model')
-    st.write(compare_df)
-    selected_model = top_3_model(best,selected_target)
-    evaluation_pycaret(selected_ml, selected_model,best)
+def save_model_pycaret(best,selected_model,selected_ml):
+    if selected_ml == 'Regression':
+        model_ = best[int(selected_model) - 1]
+    elif selected_ml == 'Classification':
+        model_ = best[int(selected_model) - 1]
+    elif selected_ml == 'Clustering':
+        model_ = best
+    st.header('Save model')
+    if st.button('Save model'):
+        save_model(model_, f'best_{selected_model}_{datetime.datetime.now()}')
+        st.write('Model saved!!')
+    else:
+        pass
+
+def pipeline_st(selected_ml):
+    if selected_ml in ['Regression','Classification']:
+        train_ratio, selected_target = init_pycaret()
+        best, compare_df = setup_pycaret(train_ratio, selected_target)
+        eda_pycaret()
+        select_scatter()
+        st.header('Compare model')
+        st.write(compare_df)
+        selected_model = top_3_model(best,selected_target)
+        evaluation_pycaret(selected_ml, selected_model,best)
+        save_model_pycaret(best,selected_model,selected_ml)
+    elif selected_ml in ['Clustering']:
+        s = setup(dataframe, normalize=True, silent=True)
+        st.header('Select clustering model')
+        cm = ('kmeans', 'ap', 'meanshift', 'sc', 'hclust', 'dbscan', 'optics', 'birch', 'kmodes')
+        selected_cm = st.selectbox('Select clustering model', cm)
+        st.write('selected clustering model :', selected_cm)
+        model = create_model(selected_cm)
+        st.write(model)
+        result = assign_model(model)
+        st.header(f'{selected_cm} model prediction')
+        st.write(result.head())
+        evaluation_pycaret(selected_ml, 1, model)
+        save_model_pycaret(model,selected_cm,selected_ml)
+
+
 
 
 # Start
@@ -181,9 +219,12 @@ dataframe,uploaded_file = initiate_dataframe()
 selected_ml = select_ml()
 if selected_ml == 'Regression' and uploaded_file is not None:
     from pycaret.regression import *
-    pipeline_st()
+    pipeline_st(selected_ml)
 elif selected_ml == 'Classification' and uploaded_file is not None:
     from pycaret.classification import *
-    pipeline_st()
+    pipeline_st(selected_ml)
+elif selected_ml == 'Clustering' and uploaded_file is not None:
+    from pycaret.clustering import *
+    pipeline_st(selected_ml)
 
 
