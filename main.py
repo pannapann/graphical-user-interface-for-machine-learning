@@ -40,6 +40,7 @@ classification_dict = {'Area Under the Curve':['auc','AUC'],
                        'Gain Curve':['gain', 'gain'],
                        'KS Statistic Plot':['ks','ks']}
 
+
 regression_dict = {'Residuals Plot':['residuals','Residuals'],
                     'Prediction Error Plot':['error', 'Prediction Error'],
                     'Cooks Distance Plot':['cooks', 'Cooks Distance'],
@@ -58,8 +59,10 @@ clustering_dict = {'Cluster PCA Plot (2d)':['cluster','cluster'],
                     'Distance Plot':['distance', 'Distance'],
                     'Distribution Plot':['distribution', 'distribution'],}
 
+
 anomaly_dict = {'t-SNE (3d) Dimension Plot':['tsne', 'tsne'],
                 'UMAP Dimensionality Plot':['umap', 'umap']}
+
 
 nlp_dict = {'Word Token Frequency':['frequency', 'Word Frequency.html'],
             'Word Distribution Plot':['distribution', 'Distribution.html'],
@@ -134,10 +137,12 @@ def setup_pycaret(train_ratio,selected_target):
     compare_df = pd.DataFrame(pull())
     return best,compare_df
 
+
 def eda_pycaret():
     st.set_option('deprecation.showPyplotGlobalUse', False)
     st.header('EDA')
     st.pyplot(eda(display_format='svg'))
+
 
 def select_ml():
     st.header('Select machine learning types')
