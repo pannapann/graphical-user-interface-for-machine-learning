@@ -6,6 +6,7 @@ import datetime
 import plotly
 import json
 import re
+
 #Todo
 # create new feature (selectable ex time date if timeseries)
 # (DONE) add plot feature (eda) or add plot scatter any graph
@@ -59,6 +60,18 @@ clustering_dict = {'Cluster PCA Plot (2d)':['cluster','cluster'],
 
 anomaly_dict = {'t-SNE (3d) Dimension Plot':['tsne', 'tsne'],
                 'UMAP Dimensionality Plot':['umap', 'umap']}
+
+nlp_dict = {'Word Token Frequency':['frequency', 'Word Frequency.html'],
+            'Word Distribution Plot':['distribution', 'Distribution.html'],
+            'Bigram Frequency Plot':['bigram', 'Bigram.html'],
+            'Trigram Frequency Plot':['trigram', 'Trigram.html'],
+            'Sentiment Polarity Plot':['sentiment', 'Sentiments.html'],
+            'Part of Speech Frequency': ['pos', 'POS.html'],
+            't-SNE (3d) Dimension Plot':['tsne', 'TSNE.html'],
+            'UMAP Dimensionality Plot':['umap', 'UMAP'],
+            # 'Topic Model (pyLDAvis)':['topic_model', 'topic_model'],
+            # 'Topic Infer Distribution':['topic_distribution', 'topic_distribution'],
+            'Wordcloud':['wordcloud', 'wordcloud']}
 
 
 def read_from_html(plot_json):
@@ -128,7 +141,7 @@ def eda_pycaret():
 
 def select_ml():
     st.header('Select machine learning types')
-    ml = ('Regression', 'Classification', 'Clustering', 'Anomaly Detection')
+    ml = ('Regression', 'Classification', 'Clustering', 'Anomaly Detection', 'Natural Language Processing')
     selected_ml = st.selectbox('Select machine learning types', ml)
     st.write('selected machine learning types :', selected_ml)
     return selected_ml
@@ -147,6 +160,9 @@ def evaluation_pycaret(selected_ml,selected_model,best):
     elif selected_ml == 'Anomaly Detection':
         dict = anomaly_dict
         model_ = best
+    elif selected_ml == 'Natural Language Processing':
+        dict = nlp_dict
+        model_ = best
 
     st.header('Select evaluation')
     options = st.multiselect(
@@ -164,8 +180,6 @@ def evaluation_pycaret(selected_ml,selected_model,best):
             st.plotly_chart(read_from_html(dict[i][1]))
 
 
-
-
 def top_3_model(best,selected_target):
     st.header('top 3 model')
     models = ('1', '2', '3')
@@ -181,6 +195,7 @@ def top_3_model(best,selected_target):
     st.write(df_test.head())
 
     return selected_model
+
 
 def select_scatter():
     st.header('Scatter plot between each feature')
@@ -206,12 +221,48 @@ def save_model_pycaret(best,selected_model,selected_ml,compare_df = 'default'):
         model_ = best
     elif selected_ml == 'Anomaly Detection':
         model_ = best
+    elif selected_ml == 'Natural Language Processing':
+        model_ = best
     st.header('Save model')
+
     if st.button('Save model'):
         save_model(model_, f'best_{selected_model}_{datetime.datetime.now()}')
         st.write('Model saved!!')
     else:
         pass
+
+
+@st.cache(suppress_st_warning=True,allow_output_mutation=True)
+def cache_model(selected_ml):
+    if selected_ml in ['Clustering', 'Anomaly Detection']:
+        s = setup(dataframe, normalize=True, silent=True)
+
+    elif selected_ml in ['Natural Language Processing']:
+        st.header('Select column to predict')
+        target = tuple(dataframe.columns)
+        selected_target = st.selectbox('Select target for prediction', target)
+        st.write('selected target :', selected_target)
+        s = setup(dataframe, target=selected_target)
+
+
+def unsupervised_pipeline(md):
+    st.header(f'Select {selected_ml} model')
+    selected_md = st.selectbox(f'Select {selected_ml} model', md)
+    st.write(f'selected {selected_ml} model :', selected_md)
+    model = unsupervised_model(selected_md)
+    result = assign_model(model)
+    st.header(f'{selected_md} model prediction')
+    st.write(result.head())
+    evaluation_pycaret(selected_ml, 1, model)
+    save_model_pycaret(model, selected_md, selected_ml)
+
+
+@st.cache(suppress_st_warning=True,allow_output_mutation=True)
+def unsupervised_model(selected_md):
+    model = create_model(selected_md)
+    st.write(model)
+    return model
+
 
 def pipeline_st(selected_ml):
     if selected_ml in ['Regression','Classification']:
@@ -226,35 +277,19 @@ def pipeline_st(selected_ml):
         save_model_pycaret(best,selected_model,selected_ml,compare_df)
 
     elif selected_ml in ['Clustering']:
-        s = setup(dataframe, normalize=True, silent=True)
-        select_scatter()
-        st.header('Select clustering model')
         cm = ('kmeans', 'ap', 'meanshift', 'sc', 'hclust', 'dbscan', 'optics', 'birch', 'kmodes')
-        selected_cm = st.selectbox('Select clustering model', cm)
-        st.write('selected clustering model :', selected_cm)
-        model = create_model(selected_cm)
-        st.write(model)
-        result = assign_model(model)
-        st.header(f'{selected_cm} model prediction')
-        st.write(result.head())
-        evaluation_pycaret(selected_ml, 1, model)
-        save_model_pycaret(model,selected_cm,selected_ml)
+        cache_model(selected_ml)
+        unsupervised_pipeline(cm)
 
     elif selected_ml in ['Anomaly Detection']:
-        s = setup(dataframe, normalize=True, silent=True)
-        select_scatter()
-        st.header('Select anomaly detection model')
         am = ('abod', 'cluster', 'cof', 'histogram', 'knn', 'lof', 'svm', 'pca', 'mcd', 'sod', 'sos')
-        selected_am = st.selectbox('Select clustering model', am)
-        st.write('selected anomaly detection model :', selected_am)
-        model = create_model(selected_am)
-        st.write(model)
-        result = assign_model(model)
-        st.header(f'{selected_am} model prediction')
-        st.write(result.head())
-        evaluation_pycaret(selected_ml, 1, model)
-        save_model_pycaret(model,selected_am,selected_ml)
+        cache_model(selected_ml)
+        unsupervised_pipeline(am)
 
+    elif selected_ml in ['Natural Language Processing']:
+        nlpm = ('lda', 'lsi', 'hdp', 'rp', 'nmf')
+        cache_model(selected_ml)
+        unsupervised_pipeline(nlpm)
 
 
 
@@ -274,6 +309,9 @@ elif selected_ml == 'Clustering' and uploaded_file is not None:
     pipeline_st(selected_ml)
 elif selected_ml == 'Anomaly Detection' and uploaded_file is not None:
     from pycaret.anomaly import *
+    pipeline_st(selected_ml)
+elif selected_ml == 'Natural Language Processing' and uploaded_file is not None:
+    from pycaret.nlp import *
     pipeline_st(selected_ml)
 
 
