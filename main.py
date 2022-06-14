@@ -19,6 +19,7 @@ import re
 # (OPTIONAL) add sort at compare_model (sort by rmse mae r2 etc)
 # add config file (store dict)
 # add tune model
+# conda activate  pyclaret  && streamlit run main.py
 
 
 classification_dict = {'Area Under the Curve':['auc','AUC'],
