@@ -1,4 +1,4 @@
-# graphical_user_interface_for_machine_learning
+# graphical user interface for machine learning
 
 <p align="center">
   <img src="assets/Jun-14-2565 21-09-35.gif" alt="Example usage" width="1920" />
