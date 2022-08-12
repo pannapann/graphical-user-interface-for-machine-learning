@@ -55,3 +55,6 @@ python -m textblob.download_corpora
 ```bash
 streamlit run main.py
 ```
+
+## Deployed app
+https://pannapann-graphical-user-interface-for-machine-lear-main-4vo7o5.streamlitapp.com/
