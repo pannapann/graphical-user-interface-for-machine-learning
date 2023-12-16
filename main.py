@@ -133,7 +133,7 @@ def initiate_dataframe():
 
 @st.cache(suppress_st_warning=True,hash_funcs={'xgboost.sklearn.XGBRegressor': id},allow_output_mutation=True)
 def setup_pycaret(train_ratio,selected_target):
-    s = setup(dataframe, target=selected_target, silent=True, train_size=train_ratio)
+    s = setup(dataframe, target=selected_target, train_size=train_ratio)
     best = compare_models(n_select=3)
     compare_df = pd.DataFrame(pull())
     return best,compare_df
